@@ -1,28 +1,23 @@
 {
-  "description": "Live graph: tells the engram-live Obsidian plugin which vault notes Claude reads, writes or finds in a search, and when Claude finishes. Does nothing unless that plugin is enabled in a vault near the project.",
+  "description": "Live graph: tells the Chickadee live graph Obsidian plugin which vault notes Claude reads, writes or finds in a search, and when Claude finishes. Runs only for Markdown files and searches, and writes nothing unless that plugin is enabled in a vault near the project.",
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "Read|Edit|Write|MultiEdit|Grep|Bash",
+        "matcher": "Read|Edit|Write|Grep|Bash",
         "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/live.sh\"",
-            "async": true,
-            "timeout": 10
-          }
+          { "type": "command", "if": "Read(*.md)", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/live.sh\"", "shell": "bash", "async": true, "timeout": 10 },
+          { "type": "command", "if": "Edit(*.md)", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/live.sh\"", "shell": "bash", "async": true, "timeout": 10 },
+          { "type": "command", "if": "Write(*.md)", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/live.sh\"", "shell": "bash", "async": true, "timeout": 10 },
+          { "type": "command", "if": "Grep", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/live.sh\"", "shell": "bash", "async": true, "timeout": 10 },
+          { "type": "command", "if": "Bash(grep *)", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/live.sh\"", "shell": "bash", "async": true, "timeout": 10 },
+          { "type": "command", "if": "Bash(rg *)", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/live.sh\"", "shell": "bash", "async": true, "timeout": 10 }
         ]
       }
     ],
     "Stop": [
       {
         "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/live.sh\"",
-            "async": true,
-            "timeout": 10
-          }
+          { "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/live.sh\"", "shell": "bash", "async": true, "timeout": 10 }
         ]
       }
     ]

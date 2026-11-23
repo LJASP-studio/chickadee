@@ -1,13 +1,13 @@
 ---
 name: note
-description: After a task, write or update an engram vault note (decision, release, feature, fix, research) and the project's status note; link, log and commit the vault locally. Use when work is done or the user asks to note it.
+description: After a task, write or update a Chickadee vault note (decision, release, feature, fix, research) and the project's status note; link, log and commit the vault locally. Use when work is done or the user asks to note it.
 argument-hint: "[what to note]"
 allowed-tools: Read Grep Glob Write Edit Bash(git -C * status *) Bash(git -C * log *) Bash(git -C * add -- *) Bash(git -C * add -A) Bash(git -C * commit -m *) Bash(sh *edited.sh*)
 ---
 
 # Write a note
 
-Read `${CLAUDE_SKILL_DIR}/../../reference/conventions.md` and the vault's `.engram.json` (find the vault as the conventions say). Subject: `$ARGUMENTS`, or what was just done in this conversation. Never write about a folder whose privacy level is `none`.
+Read `${CLAUDE_SKILL_DIR}/../../reference/conventions.md` and the vault's `.chickadee.json` (find the vault as the conventions say). Subject: `$ARGUMENTS`, or what was just done in this conversation. Never write about a folder whose privacy level is `none`.
 
 1. **Decide whether it is worth a note.** Decisions with their reason, releases, new or changed features, fixed bugs whose cause was not obvious, research results, where something lives in the code. Not chit-chat, not secrets, not personal data. When in doubt, ask in one line or skip.
 2. **Search first.** Glob the likely title; Grep `^description:` and the key words across the vault. If a note covers the subject, update it (facts, `code:` paths, source) rather than writing a second one. If it already says everything, change nothing to it.

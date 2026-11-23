@@ -1,5 +1,5 @@
 # tide-cli
 
-Prints tide times for a harbour from a public tide table. Synthetic sample project for the engram engine.
+Prints tide times for a harbour from a public tide table. Synthetic sample project for Chickadee.
 
 Run: `go run ./cmd/tide <harbour>`. Test: `go test ./...`.

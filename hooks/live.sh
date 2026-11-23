@@ -1,22 +1,25 @@
 #!/bin/sh
-# engram live graph: PostToolUse hook for Read, Edit, Write, Grep and Bash, and Stop hook.
+# Chickadee live graph: PostToolUse hook for Markdown reads and writes and for searches
+# (Read, Edit, Write, Grep, and grep or rg in Bash), and Stop hook.
 #
-# When Claude reads or writes a note inside a vault whose Obsidian runs the engram-live
-# plugin, append one JSON line to that vault's .obsidian/plugins/engram-live/live.jsonl:
+# When Claude reads or writes a note inside a vault whose Obsidian runs the Chickadee live
+# graph plugin, append one JSON line to that vault's .obsidian/plugins/chickadee-live/live.jsonl:
 #   {"v":1,"tool":"Read","path":"Projects/Inkwell/Inkwell.md","session":"<session id>"}
 # A search (the Grep tool, or grep and rg in Bash) adds one line per vault note its output
 # names, with "tool":"Grep" or "tool":"Bash"; the plugin shows those as search matches.
 # When Claude finishes a turn, append {"v":1,"event":"stop","session":"<session id>"} so
 # the plugin can let the lit notes fade out.
 # The plugin creates live.jsonl while it is enabled and removes it when it is disabled, so
-# the file is also the switch: without it this script reads its input and exits.
+# the file is also the switch: without it this script reads its input and exits. The plugin's
+# earlier folder, .obsidian/plugins/engram-live, is served the same way, so a vault that still
+# runs the plugin under its earlier name keeps working.
 # Vaults are looked for in the project folder, its parent and its grandparent, and one
 # level below each. Only the path of the touched file inside the vault and the session id
-# are written: no file contents, no paths outside the vault, nothing over the network. Prints nothing and
-# always exits 0, so it never shows up in Claude's context.
+# are written: no file contents, no paths outside the vault, nothing over the network.
+# Prints nothing and always exits 0, so it never shows up in Claude's context.
 # POSIX sh and awk; needs Git Bash on Windows.
 
-M=.obsidian/plugins/engram-live/live.jsonl
+LOGS=".obsidian/plugins/chickadee-live/live.jsonl .obsidian/plugins/engram-live/live.jsonl"
 LIMIT_KB=1024 # stop appending past 1 MB, e.g. when Obsidian quit without unloading the plugin
 
 d=${CLAUDE_PROJECT_DIR:-$PWD}
@@ -25,11 +28,13 @@ case $d in *\\*) d=$(printf '%s' "$d" | tr '\\' /) ;; esac
 found=
 n=0
 while [ "$n" -lt 3 ]; do
-  for f in "$d/$M" "$d"/*/"$M"; do
-    [ -f "$f" ] || continue
-    [ -n "$(find "$f" -size +"$LIMIT_KB"k 2>/dev/null)" ] && continue
-    found="$found$f
+  for m in $LOGS; do
+    for f in "$d/$m" "$d"/*/"$m"; do
+      [ -f "$f" ] || continue
+      [ -n "$(find "$f" -size +"$LIMIT_KB"k 2>/dev/null)" ] && continue
+      found="$found$f
 "
+    done
   done
   p=${d%/*}
   if [ -z "$p" ] || [ "$p" = "$d" ]; then break; fi
@@ -42,7 +47,7 @@ if [ -z "$found" ]; then
   exit 0
 fi
 
-ENGRAM_LIVE_LOGS=$found ENGRAM_LIVE_SUFFIX=/$M LC_ALL=C awk '
+CHICKADEE_LIVE_LOGS=$found LC_ALL=C awk '
 function hexval(h,   i, v, c) {
   v = 0
   for (i = 1; i <= length(h); i++) {
@@ -153,8 +158,7 @@ function addarr(key,   rest, item) {
 { s = s $0 "\n" }
 END {
   session = jesc(jstr("session_id"))
-  suffix = ENVIRON["ENGRAM_LIVE_SUFFIX"]
-  nlogs = split(ENVIRON["ENGRAM_LIVE_LOGS"], logs, "\n")
+  nlogs = split(ENVIRON["CHICKADEE_LIVE_LOGS"], logs, "\n")
   if (jstr("hook_event_name") == "Stop") {
     for (j = 1; j <= nlogs; j++) {
       if (logs[j] == "") continue
@@ -173,7 +177,7 @@ END {
   for (j = 1; j <= nlogs; j++) {
     lf = logs[j]
     if (lf == "") continue
-    vault = norm(substr(lf, 1, length(lf) - length(suffix)))
+    vault = lf; sub(/\/\.obsidian\/plugins\/[^\/]+\/live\.jsonl$/, "", vault); vault = norm(vault)
     lv = tolower(vault) "/"
     wrote = 0
     for (k = 1; k <= np; k++) {

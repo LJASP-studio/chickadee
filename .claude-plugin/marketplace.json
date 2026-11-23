@@ -1,14 +1,18 @@
 {
-  "name": "engram",
+  "name": "chickadee",
   "owner": {
     "name": "LJASP-studio"
   },
-  "description": "Marketplace for the engram plugin.",
+  "description": "Marketplace for the Chickadee plugin.",
+  "renames": {
+    "engram": "chickadee"
+  },
   "plugins": [
     {
-      "name": "engram",
+      "name": "chickadee",
+      "displayName": "Chickadee",
       "source": "./",
-      "description": "Portable second brain: an Obsidian vault per machine with notes that point to code."
+      "description": "A portable second brain for Claude Code: one Obsidian vault per machine, small linked notes that point to code, and four skills to set it up, scan projects, write notes and keep the vault healthy."
     }
   ]
 }

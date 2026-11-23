@@ -1,11 +1,11 @@
 #!/bin/sh
-# edited.sh: which notes hold your own edits, so engram never overwrites them. POSIX sh + awk + git.
+# edited.sh: which notes hold your own edits, so Chickadee never overwrites them. POSIX sh + awk + git.
 #
 # Usage: edited.sh VAULT [NOTE ...]
 #   NOTE  path of a note: relative to the vault, or absolute inside it (default: every note)
 #
 # Prints, relative to the vault, each given note that has uncommitted changes, or whose history
-# (renames followed) has a commit engram did not make. engram's own commits start with "docs: "
+# (renames followed) has a commit Chickadee did not make. Chickadee's own commits start with "docs: "
 # or "chore: ". "chore: snapshot manual edits" stores your edits and "docs: merge " carries
 # them into another note, so both count as yours. In a vault with no commits yet, or one that
 # is not a git repository, every note is printed.
@@ -18,7 +18,7 @@ if [ $# -lt 1 ] || [ ! -d "$1" ]; then
   exit 2
 fi
 cd "$1"; shift
-TMP=$(mktemp -d 2>/dev/null || mktemp -d -t engram)
+TMP=$(mktemp -d 2>/dev/null || mktemp -d -t chickadee)
 trap 'rm -rf "$TMP"' EXIT INT TERM
 
 ISREPO=0
@@ -60,7 +60,7 @@ fi
   # Uncommitted: changed since the last commit, or never committed.
   git -c core.quotePath=false diff --name-only HEAD --
   git -c core.quotePath=false ls-files --others --exclude-standard
-  # Committed by someone other than engram. History runs newest first, so a rename maps the
+  # Committed by someone other than Chickadee. History runs newest first, so a rename maps the
   # older name to the file's current name.
   git -c core.quotePath=false log -M --name-status --format='@%s' |
     awk -F '\t' '

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0 - 2026-11-23
+
+- engram is now Chickadee. The plugin and its marketplace are `chickadee`, the commands `/chickadee:setup`, `/chickadee:scan`, `/chickadee:note` and `/chickadee:check`, and the repository github.com/LJASP-studio/chickadee; old links redirect. To move an engram install over, see "Moving over from engram" in `docs/install.md`.
+- Vaults set up by engram keep working. Every skill and the check script read `.engram.json` when there is no `.chickadee.json`, and `/chickadee:setup` on such a vault offers a short upgrade: it renames the config, renames the routing block's markers and commands without touching the rest of the block, and installs the live graph under its new name. No note is touched. The marketplace lists the old plugin name under `renames`, so Claude Code carries an old install's enabled setting over to the new name.
+- Live graph: the Obsidian plugin is now "Chickadee live graph" (`chickadee-live`) and says it needs Obsidian 1.15, the version whose graph internals it uses (it said 1.5.0). If the old `engram-live` is still enabled, the new plugin copies its settings once and turns it off. The hook writes for both folders, so a vault still on the old plugin keeps its live graph.
+- The live graph hook runs only after Claude reads or writes a Markdown file or runs a search (the Grep tool, or grep or rg in the shell), no longer after every tool call, and always in Git Bash on Windows instead of falling back to PowerShell.
+- Listing: `plugin.json` has a display name, a homepage, an icon and the `claude-code` keyword, and the marketplace entry carries the same description. New `SECURITY.md`, `CONTRIBUTING.md` and a bug report template.
+- Docs: the README shows an example note, lists Git for Windows under Get started and says read-deny rules hold in sessions started in the projects folder, while a session started inside one project reads that project's own settings. `docs/install.md` says only `note` is in every session's context, not all four skills. `reference/conventions.md` documents the config's `fields` and `tags` keys, and check and scan pass `fields.date` to the check script. The example vault's status notes have sourced lines.
+
 ## 0.6.1 - 2026-11-10
 
 - The repository moved to github.com/LJASP-studio/engram. New installs use `claude plugin marketplace add LJASP-studio/engram`. Existing installs and old `muazfurkan/engram` links keep working through GitHub's redirect; nothing else changed.
@@ -40,7 +49,7 @@
 
 - Concept notes: a `Concepts` folder for themes that notes in two or more projects share (security, privacy, determinism, localisation). Conventions, layout, hub templates, graph preset and the example vault have it; `scan` writes concept notes after the merge and `note` adds new notes to them.
 - `scan` splits a large project into two briefs (documents and code map; history, decisions and data) so a subagent does not run out of context.
-- Routing block and retrieval order are description-first: grep `^description:` with the `code:` lines, and read the hub and folder indexes only for broad questions. Measured on a real workspace (13 questions, two runs per question and order, against the same workspace without a vault), the old hub-first order used 18 percent fewer tokens and was cheaper on only 5 of 13 questions; description-first used 46 percent fewer tokens, 54 percent lower cost and 7 turns instead of 10, cheaper on 11 of 13.
+- Routing block and retrieval order are description-first: grep `^description:` with the `code:` lines, and read the hub and folder indexes only for broad questions. Measured on a real workspace (13 questions, two runs per question and order, against the same workspace without a vault), the old hub-first order used 18 percent fewer tokens and was cheaper on only 5 of 13 questions; description-first used 46 percent fewer tokens, 54 percent lower cost and 7 turns instead of 10, cheaper on 11 of 13. (Measured on the previous model generation; on current models the saving did not hold, see 0.5.0.)
 - Scan brief: related notes go in `links:` only, and a hub update carries only its lead text, so merged hubs do not get a second content list.
 
 ## 0.1.0 - 2026-11-05

@@ -5,7 +5,7 @@ tags: [status]
 ---
 # {{project}} status
 
-`/engram:note` güncel tutar; her madde tarihli tek satır, en yenisi sonda. Senin eklediğin satırlar korunur.
+`/chickadee:note` güncel tutar; her madde tarihli tek satır, en yenisi sonda. Senin eklediğin satırlar korunur.
 
 ## Şimdi
 {{now}}

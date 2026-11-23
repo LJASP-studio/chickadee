@@ -1,5 +1,5 @@
-/* engram live graph: the counter in the graph view. */
-.engram-live-counter {
+/* Chickadee live graph: the counter in the graph view. */
+.chickadee-live-counter {
   position: absolute;
   top: var(--size-4-3, 12px);
   left: var(--size-4-3, 12px);
@@ -9,34 +9,34 @@
   border-radius: var(--radius-m, 8px);
   background: color-mix(in srgb, var(--background-primary) 72%, transparent);
   font-variant-numeric: tabular-nums;
-  animation: engram-live-in 240ms ease-out;
+  animation: chickadee-live-in 240ms ease-out;
 }
 
-.engram-live-count {
+.chickadee-live-count {
   font-size: 26px;
   font-weight: 600;
   line-height: 1.15;
   color: var(--text-muted);
 }
 
-.engram-live-reads {
-  color: var(--engram-live-read);
+.chickadee-live-reads {
+  color: var(--chickadee-live-read);
 }
 
-.engram-live-label {
+.chickadee-live-label {
   font-size: var(--font-ui-smaller, 12px);
   color: var(--text-muted);
 }
 
-.engram-live-writes {
-  color: var(--engram-live-write);
+.chickadee-live-writes {
+  color: var(--chickadee-live-write);
 }
 
-.engram-live-matches {
+.chickadee-live-matches {
   color: var(--text-normal);
 }
 
-@keyframes engram-live-in {
+@keyframes chickadee-live-in {
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: none; }
 }

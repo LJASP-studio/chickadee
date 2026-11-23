@@ -1,5 +1,5 @@
 #!/bin/sh
-# lint.sh: mechanical health checks for an engram vault. POSIX sh + awk + git only.
+# lint.sh: mechanical health checks for a Chickadee vault. POSIX sh + awk + git only.
 #
 # Usage: lint.sh VAULT [DATE_FIELD] [DAILY_FOLDER] [HUB] [LOG] [TODAY]
 #   DATE_FIELD    frontmatter key holding the note date (default: date)
@@ -7,8 +7,10 @@
 #   HUB, LOG      note names of the hub and the log, without .md (default: Home, Log)
 #   TODAY         YYYY-MM-DD (default: today)
 #
-# Reads VAULT/.engram.json when it exists: projectsRoot, folders, lastScan and privacy.
-# Without it the checks that need the projects (code paths, staleness, privacy) are skipped.
+# Reads the vault's config when it exists: VAULT/.chickadee.json, or VAULT/.engram.json in a
+# vault set up before the plugin was renamed (0.7.0). Uses projectsRoot, folders, lastScan and
+# privacy. Without a config the checks that need the projects (code paths, staleness, privacy)
+# are skipped.
 #
 # Output: one finding per line, "CHECK<TAB>path<TAB>detail", then "SUMMARY<TAB>CHECK<TAB>count".
 # Errors:   MISSING_FRONTMATTER MISSING_DESCRIPTION MISSING_DATE MISSING_SOURCE BROKEN_LINK
@@ -35,7 +37,7 @@ TODAY=${6:-$(date +%Y-%m-%d)}
 TAB=$(printf '\t')
 
 cd "$VAULT"
-TMP=$(mktemp -d 2>/dev/null || mktemp -d -t engram)
+TMP=$(mktemp -d 2>/dev/null || mktemp -d -t chickadee)
 trap 'rm -rf "$TMP"' EXIT INT TERM
 
 # Every file (links may point at attachments or .base files) and every note.
@@ -82,10 +84,14 @@ else
   echo "skip" > "$TMP/todaymode"
 fi
 
-# .engram.json, flattened to one line per value: key<TAB>key...<TAB>value.
+# The config file: .chickadee.json, else the pre-0.7.0 name .engram.json.
+CFG=.chickadee.json
+[ ! -f "$CFG" ] && [ -f .engram.json ] && CFG=.engram.json
+
+# The config, flattened to one line per value: key<TAB>key...<TAB>value.
 # Objects and arrays also get a line with the value {} or [], so empty ones are visible.
 : > "$TMP/cfg"
-if [ -f .engram.json ]; then
+if [ -f "$CFG" ]; then
   awk '
   function emit(val,   d, p) {
     p = ""
@@ -124,7 +130,7 @@ if [ -f .engram.json ]; then
       }
       emit(tok)
     }
-  }' .engram.json > "$TMP/cfg"
+  }' "$CFG" > "$TMP/cfg"
 fi
 
 cfg() { # cfg KEY...: value at that key path, empty when absent
@@ -133,7 +139,7 @@ cfg() { # cfg KEY...: value at that key path, empty when absent
     NF == n + 1 { for (i = 1; i <= n; i++) if ($i != want[i]) next; print $NF; exit }' "$TMP/cfg"
 }
 
-# Projects root, staleness and privacy inputs. All of it needs .engram.json.
+# Projects root, staleness and privacy inputs. All of it needs the config.
 ROOTDIR=""
 : > "$TMP/changes"; : > "$TMP/ntimes"; : > "$TMP/settings"
 if [ -s "$TMP/cfg" ]; then
@@ -172,10 +178,10 @@ if [ -n "$ROOTDIR" ]; then
   fi
 fi
 
-ENGRAM_ROOT=$ROOTDIR ENGRAM_ROOT_SET=${root:-} ENGRAM_TMP=$TMP LC_ALL=C awk \
+CHICKADEE_ROOT=$ROOTDIR CHICKADEE_ROOT_SET=${root:-} CHICKADEE_TMP=$TMP LC_ALL=C awk \
   -v all="$TMP/all" -v notes="$TMP/notes" -v todayf="$TMP/today" -v modef="$TMP/todaymode" \
   -v cfgf="$TMP/cfg" -v changesf="$TMP/changes" -v ntimesf="$TMP/ntimes" -v settingsf="$TMP/settings" \
-  -v datefield="$DATE_FIELD" -v daily="$DAILY" -v hub="$HUB.md" -v logf="$LOG.md" -v today="$TODAY" '
+  -v cfgname="$CFG" -v datefield="$DATE_FIELD" -v daily="$DAILY" -v hub="$HUB.md" -v logf="$LOG.md" -v today="$TODAY" '
 function base(p,   b) { b = p; sub(/.*\//, "", b); return b }
 function dir(p,   d) { d = p; if (d !~ /\//) return "."; sub(/\/[^\/]*$/, "", d); return d }
 function top(p,   t) { t = p; sub(/\/.*/, "", t); return t }
@@ -304,7 +310,7 @@ BEGIN {
   split("projects:Projects decisions:Decisions releases:Releases tech:Tech concepts:Concepts proposals:Proposals", defs, " ")
   for (i in defs) { split(defs[i], kv, ":"); if (!(kv[1] in folder)) folder[kv[1]] = kv[2] }
   proposals = folder["proposals"]
-  rootdir = ENVIRON["ENGRAM_ROOT"]; tmpdir = ENVIRON["ENGRAM_TMP"]
+  rootdir = ENVIRON["CHICKADEE_ROOT"]; tmpdir = ENVIRON["CHICKADEE_TMP"]
 
   while ((getline p < all) > 0) {
     anypath[tolower(p)] = 1; anybase[tolower(base(p))] = 1
@@ -404,7 +410,7 @@ BEGIN {
       }
     }
     close(codelist)
-    system("while IFS= read -r p; do [ -e \"$ENGRAM_ROOT/$p\" ] || printf \"%s\\n\" \"$p\"; done < \"$ENGRAM_TMP/codepaths\" > \"$ENGRAM_TMP/missing\"")
+    system("while IFS= read -r p; do [ -e \"$CHICKADEE_ROOT/$p\" ] || printf \"%s\\n\" \"$p\"; done < \"$CHICKADEE_TMP/codepaths\" > \"$CHICKADEE_TMP/missing\"")
     while ((getline p < missingf) > 0) missing[p] = 1
     close(missingf)
     for (i = 1; i <= n; i++) {
@@ -441,16 +447,16 @@ BEGIN {
       if (what != "") report("STALE", f, what " changed after the last scan")
     }
 
-    # Privacy: .engram.json and the read-deny rules must agree; none projects have no notes.
-    if (!hasprivacy) report("PRIVACY_UNSET", ".engram.json", "no privacy block: run the privacy step of /engram:setup")
+    # Privacy: the config and the read-deny rules must agree; none projects have no notes.
+    if (!hasprivacy) report("PRIVACY_UNSET", cfgname, "no privacy block: run the privacy step of /chickadee:setup")
     else {
       settings = ""
       while ((getline line < settingsf) > 0) settings = settings line "\n"
       close(settingsf)
       for (k in level) {
         rule = "\"Read(/" k "/**)\""
-        if (level[k] == "none" && !index(settings, rule)) report("PRIVACY_MISMATCH", k, "none in .engram.json but " rule " is missing from .claude/settings.json")
-        else if (level[k] != "none" && index(settings, rule)) report("PRIVACY_MISMATCH", k, level[k] " in .engram.json but " rule " is in .claude/settings.json")
+        if (level[k] == "none" && !index(settings, rule)) report("PRIVACY_MISMATCH", k, "none in " cfgname " but " rule " is missing from .claude/settings.json")
+        else if (level[k] != "none" && index(settings, rule)) report("PRIVACY_MISMATCH", k, level[k] " in " cfgname " but " rule " is in .claude/settings.json")
         if (level[k] != "full" && level[k] != "structure" && level[k] != "none") report("PRIVACY_MISMATCH", k, "unknown level " level[k])
       }
       for (j = 1; j <= nexclude; j++) {
@@ -470,7 +476,7 @@ BEGIN {
       }
     }
   } else if (hascfg) {
-    report("PROJECTS_ROOT_MISSING", ".engram.json", "projectsRoot " ENVIRON["ENGRAM_ROOT_SET"] " is not a folder: code paths, staleness and privacy were not checked")
+    report("PROJECTS_ROOT_MISSING", cfgname, "projectsRoot " ENVIRON["CHICKADEE_ROOT_SET"] " is not a folder: code paths, staleness and privacy were not checked")
   }
 
   # Daily note coverage.

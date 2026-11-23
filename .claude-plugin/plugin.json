@@ -1,12 +1,15 @@
 {
-  "name": "engram",
-  "version": "0.6.1",
+  "name": "chickadee",
+  "displayName": "Chickadee",
+  "version": "0.7.0",
   "description": "A portable second brain for Claude Code: one Obsidian vault per machine, small linked notes that point to code, and four skills to set it up, scan projects, write notes and keep the vault healthy.",
   "author": {
     "name": "muazfurkan",
     "url": "https://github.com/muazfurkan"
   },
-  "repository": "https://github.com/LJASP-studio/engram",
+  "homepage": "https://github.com/LJASP-studio/chickadee#readme",
+  "repository": "https://github.com/LJASP-studio/chickadee",
   "license": "MIT",
-  "keywords": ["obsidian", "second-brain", "notes", "memory", "knowledge-base"]
+  "icon": "./assets/icon.png",
+  "keywords": ["claude-code", "obsidian", "second-brain", "notes", "memory", "knowledge-base"]
 }

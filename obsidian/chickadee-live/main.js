@@ -1,13 +1,13 @@
 'use strict';
 /*
- * engram live graph for Obsidian.
+ * Chickadee live graph for Obsidian.
  *
  * Shows Claude Code's work on the vault as activity in the graph view: a note Claude reads
  * or writes ignites and keeps glowing while Claude works, signals run along its links, a note
  * a search only found glows faintly, the rest of the graph dims, and when Claude finishes its
  * turn everything fades out slowly.
  *
- * The engram Claude Code plugin has a hook (hooks/live.sh) that appends one JSON line per
+ * The Chickadee Claude Code plugin has a hook (hooks/live.sh) that appends one JSON line per
  * touched note, and one per finished turn, to live.jsonl in this plugin's folder. This
  * plugin creates that file while it is enabled (the file is also the hook's switch), reads
  * new lines from it and removes it when it is disabled. Nothing goes over the network.
@@ -15,6 +15,10 @@
  * The graph renderer is internal to Obsidian and undocumented (checked on 1.15, PIXI 7).
  * Every call into it is guarded: where it differs, the plugin stays dark instead of
  * breaking the graph. Plain CommonJS, no build step.
+ *
+ * Until 0.7.0 this plugin was called engram live graph (id engram-live). When that one is
+ * still enabled, this plugin takes over: it copies the old settings once, if it has none of
+ * its own, and turns the old plugin off, so two copies never draw on the same graph.
  */
 
 const obsidian = require('obsidian');
@@ -24,7 +28,8 @@ const fsp = fs.promises;
 const nodePath = require('path');
 
 const LOG = 'live.jsonl';
-const PLUGIN_DIR = '.obsidian/plugins/engram-live';
+const PLUGIN_DIR = '.obsidian/plugins/chickadee-live';
+const OLD_ID = 'engram-live'; // this plugin's id before 0.7.0
 const POLL_MS = 120;
 const TRUNCATE_AT = 256 * 1024;
 const RISE_MS = 700; // the graph dims in this long when work starts
@@ -56,7 +61,8 @@ const STRINGS = {
     matches: 'Show search matches',
     matchesDesc: 'Notes whose lines a search returned (the Grep tool, or grep and rg in the shell) glow faintly in their own color.',
     reset: 'Reset the live graph',
-    wrongDir: 'engram live graph: install it in .obsidian/plugins/engram-live, or Claude Code\'s hook cannot find it.',
+    wrongDir: 'Chickadee live graph: install it in .obsidian/plugins/chickadee-live, or Claude Code\'s hook cannot find it.',
+    replaced: 'Chickadee live graph took over from engram live graph, its earlier name, and turned it off. Your settings came along. You can uninstall the old plugin in Settings → Community plugins.',
     readColor: 'Read color',
     readColorDesc: 'A note Claude reads.',
     writeColor: 'Write color',
@@ -81,7 +87,8 @@ const STRINGS = {
     matches: 'Arama eşleşmelerini göster',
     matchesDesc: 'Bir aramanın satırlarını döndürdüğü notlar (Grep aracı ya da kabuktaki grep ve rg) kendi renklerinde soluk yanar.',
     reset: 'Canlı grafiği sıfırla',
-    wrongDir: 'engram live graph: .obsidian/plugins/engram-live klasörüne kurun, yoksa Claude Code\'un hook\'u eklentiyi bulamaz.',
+    wrongDir: 'Chickadee live graph: .obsidian/plugins/chickadee-live klasörüne kurun, yoksa Claude Code\'un hook\'u eklentiyi bulamaz.',
+    replaced: 'Chickadee live graph, eski adı engram live graph olan eklentinin yerini aldı ve onu kapattı. Ayarlarınız taşındı. Eski eklentiyi Ayarlar → Topluluk eklentileri\'nden kaldırabilirsiniz.',
     readColor: 'Okuma rengi',
     readColorDesc: 'Claude\'un okuduğu not.',
     writeColor: 'Yazma rengi',
@@ -133,9 +140,10 @@ function easeOut(x) {
   return 1 - Math.pow(1 - x, 3);
 }
 
-class EngramLive extends Plugin {
+class ChickadeeLive extends Plugin {
   async onload() {
-    this.settings = Object.assign({}, DEFAULTS, await this.loadData());
+    const saved = await this.loadData();
+    this.settings = Object.assign({}, DEFAULTS, saved);
     this.t = STRINGS[language()];
     this.notes = new Map(); // vault path -> { at, lastAt, kind, read, write, phase }
     this.sessions = new Map(); // session id -> { stoppedAt }
@@ -171,7 +179,7 @@ class EngramLive extends Plugin {
       if (!fs.existsSync(ignore)) await fsp.writeFile(ignore, LOG + '\n');
       await fsp.writeFile(this.logPath, '');
     } catch (e) {
-      console.warn('engram live graph: cannot write ' + LOG, e);
+      console.warn('Chickadee live graph: cannot write ' + LOG, e);
       return;
     }
 
@@ -180,7 +188,34 @@ class EngramLive extends Plugin {
       this.ensurePatched();
       this.updateCounters(performance.now());
     }));
-    this.app.workspace.onLayoutReady(() => this.ensurePatched());
+    this.app.workspace.onLayoutReady(() => {
+      this.ensurePatched();
+      this.takeOver(saved);
+    });
+  }
+
+  // Replace the plugin's pre-0.7.0 copy (id engram-live) if it is still enabled: carry its
+  // settings over when this plugin has none, then turn it off. Plugin management is internal
+  // to Obsidian, so every step is guarded; if one fails, both copies simply keep running.
+  async takeOver(saved) {
+    const plugins = this.app.plugins;
+    let enabled = false;
+    try { enabled = !!(plugins && plugins.enabledPlugins && plugins.enabledPlugins.has(OLD_ID)); } catch (e) { return; }
+    if (!enabled || typeof plugins.disablePluginAndSave !== 'function') return;
+    if (saved == null) {
+      try {
+        const adapter = this.app.vault.adapter;
+        const old = this.app.vault.configDir + '/plugins/' + OLD_ID + '/data.json';
+        if (await adapter.exists(old)) {
+          this.settings = Object.assign({}, DEFAULTS, JSON.parse(await adapter.read(old)));
+          await this.saveSettings();
+        }
+      } catch (e) { console.warn('Chickadee live graph: cannot read the old settings', e); }
+    }
+    try {
+      await plugins.disablePluginAndSave(OLD_ID);
+      new Notice(this.t.replaced, 12000);
+    } catch (e) { console.warn('Chickadee live graph: cannot turn off ' + OLD_ID, e); }
   }
 
   onunload() {
@@ -209,7 +244,7 @@ class EngramLive extends Plugin {
 
   // A search match keeps the note's own color (remembered from the last frame); reads and writes use theirs.
   colorOf(st, node) {
-    if (st.kind === 'match') return node && typeof node.engramBase === 'number' ? node.engramBase : this.readRgb;
+    if (st.kind === 'match') return node && typeof node.chickadeeBase === 'number' ? node.chickadeeBase : this.readRgb;
     return st.kind === 'write' ? this.writeRgb : this.readRgb;
   }
 
@@ -614,8 +649,8 @@ class EngramLive extends Plugin {
         const line = this.line;
         const arrow = this.arrow;
         // Obsidian eases link alpha from its last value, so undo the dimming before it runs.
-        if (line && line.engramAlpha !== undefined) line.alpha = line.engramAlpha;
-        if (arrow && arrow.engramAlpha !== undefined) arrow.alpha = arrow.engramAlpha;
+        if (line && line.chickadeeAlpha !== undefined) line.alpha = line.chickadeeAlpha;
+        if (arrow && arrow.chickadeeAlpha !== undefined) arrow.alpha = arrow.chickadeeAlpha;
         const out = orig.render.apply(this, arguments);
         let k = 1;
         if (!self.stopped && self.mode !== 'idle') {
@@ -624,10 +659,10 @@ class EngramLive extends Plugin {
         for (const g of [line, arrow]) {
           if (!g) continue;
           if (k !== 1) {
-            g.engramAlpha = g.alpha;
+            g.chickadeeAlpha = g.alpha;
             g.alpha = Math.min(1, g.alpha * k);
-          } else if (g.engramAlpha !== undefined) {
-            g.engramAlpha = undefined;
+          } else if (g.chickadeeAlpha !== undefined) {
+            g.chickadeeAlpha = undefined;
           }
         }
         return out;
@@ -663,7 +698,7 @@ class EngramLive extends Plugin {
     if (level <= 0) return base;
     const st = this.notes.get(node.id);
     if (st) {
-      node.engramBase = base.rgb;
+      node.chickadeeBase = base.rgb;
       const g = clamp01((this.glowOf(st, now) + this.burstOf(st, now)) * level * this.strengthOf(st));
       const a = base.a * this.dimOthers(level);
       return { a: a + (1 - a) * g, rgb: mixRgb(base.rgb, this.colorOf(st, node), clamp01(g * 1.15)) };
@@ -751,7 +786,7 @@ class EngramLive extends Plugin {
       let el = this.counterHosts.get(host);
       if (!el || !el.isConnected) {
         if (window.getComputedStyle(host).position === 'static') host.style.position = 'relative';
-        el = host.createDiv({ cls: 'engram-live-counter' });
+        el = host.createDiv({ cls: 'chickadee-live-counter' });
         this.counterHosts.set(host, el);
       }
       this.renderCounter(el);
@@ -782,15 +817,15 @@ class EngramLive extends Plugin {
       if (st.match) matches++;
     }
     const total = this.app.vault.getMarkdownFiles().length;
-    el.style.setProperty('--engram-live-read', this.settings.readColor);
-    el.style.setProperty('--engram-live-write', this.settings.writeColor);
+    el.style.setProperty('--chickadee-live-read', this.settings.readColor);
+    el.style.setProperty('--chickadee-live-write', this.settings.writeColor);
     el.empty();
-    const count = el.createDiv({ cls: 'engram-live-count' });
-    count.createSpan({ cls: 'engram-live-reads', text: String(reads) });
-    count.createSpan({ cls: 'engram-live-total', text: ' / ' + total });
-    const label = el.createDiv({ cls: 'engram-live-label', text: this.t.read });
-    if (matches) label.createSpan({ cls: 'engram-live-matches', text: ' · ' + matches + ' ' + this.t.matched });
-    if (writes) label.createSpan({ cls: 'engram-live-writes', text: ' · ' + writes + ' ' + this.t.written });
+    const count = el.createDiv({ cls: 'chickadee-live-count' });
+    count.createSpan({ cls: 'chickadee-live-reads', text: String(reads) });
+    count.createSpan({ cls: 'chickadee-live-total', text: ' / ' + total });
+    const label = el.createDiv({ cls: 'chickadee-live-label', text: this.t.read });
+    if (matches) label.createSpan({ cls: 'chickadee-live-matches', text: ' · ' + matches + ' ' + this.t.matched });
+    if (writes) label.createSpan({ cls: 'chickadee-live-writes', text: ' · ' + writes + ' ' + this.t.written });
   }
 
   removeCounters() {
@@ -836,4 +871,4 @@ class LiveSettings extends PluginSettingTab {
   }
 }
 
-module.exports = EngramLive;
+module.exports = ChickadeeLive;

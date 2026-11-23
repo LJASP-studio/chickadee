@@ -5,7 +5,7 @@ tags: [status]
 ---
 # {{project}} status
 
-Kept current by `/engram:note`; one dated line per item, newest last. Lines you add are kept.
+Kept current by `/chickadee:note`; one dated line per item, newest last. Lines you add are kept.
 
 ## Now
 {{now}}

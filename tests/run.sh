@@ -7,7 +7,7 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 LINT="$ROOT/skills/check/scripts/lint.sh"
 EDITED="$ROOT/skills/scan/scripts/edited.sh"
 LIVE="$ROOT/hooks/live.sh"
-WORK=$(mktemp -d 2>/dev/null || mktemp -d -t engram-test)
+WORK=$(mktemp -d 2>/dev/null || mktemp -d -t chickadee-test)
 trap 'rm -rf "$WORK"' EXIT INT TERM
 FAILS=0
 V="$WORK/v"
@@ -44,7 +44,7 @@ commit_at() { # commit_at DIR DATE MESSAGE: commit everything in DIR at a fixed 
       git -c user.name=test -c user.email=test@example.invalid commit -q -m "$3" )
 }
 
-# 1. A small vault for a made-up note-taking app, with one problem of each kind. No .engram.json.
+# 1. A small vault for a made-up note-taking app, with one problem of each kind. No .chickadee.json.
 note Home.md '---' 'description: Entry point.' 'date: 2026-01-01' 'tags: [moc]' '---' '# Home' \
   '- [[Projects]]' '- [[Decisions]]' '- [[Daily]]' 'Changes: [[Log]]'
 note Log.md '---' 'description: Change log.' 'date: 2026-01-01' '---' '# Log' '- 2026-01-01 setup | Vault created'
@@ -108,7 +108,7 @@ expect_line NOT_IN_DAILY Projects/Inkwell/Search.md
 expect DAILY_CHECK_SKIPPED 0
 expect DAILY_CHECK_BY_DATE 0
 
-# 3. A workspace with .engram.json: a git project scanned at a known commit, a project set to
+# 3. A workspace with .chickadee.json: a git project scanned at a known commit, a project set to
 #    none, read-deny rules, code paths, decisions inferred from commits and a pending proposal.
 SCENARIO=workspace
 WS="$WORK/ws"; V="$WS/brain"
@@ -120,7 +120,7 @@ commit_at "$WS/app" 2026-01-01 "feat: first version"
 SCANNED=$(git -C "$WS/app" rev-parse --short HEAD)
 printf '%s\n' '{ "permissions": { "deny": [ "Read(./**/.env)", "Read(/secret/**)", "Read(/app/**)" ] } }' \
   > "$WS/.claude/settings.json"
-note .engram.json '{' '  "version": 1,' '  "language": "en",' '  "projectsRoot": "..",' \
+note .chickadee.json '{' '  "version": 1,' '  "language": "en",' '  "projectsRoot": "..",' \
   '  "folders": { "projects": "Projects", "decisions": "Decisions", "daily": "Daily" },' \
   "  \"lastScan\": { \"app\": { \"commit\": \"$SCANNED\", \"date\": \"2026-01-01\" } }," \
   '  "privacy": {' '    "projects": { "app": "full", "secret": "none" },' \
@@ -202,7 +202,7 @@ mkdir -p "$WS/my app/src"; printf 'x\n' > "$WS/my app/src/x.ts"
 ( cd "$WS/my app" && git init -q ); commit_at "$WS/my app" 2026-01-01 "feat: x"
 MYAPP=$(git -C "$WS/my app" rev-parse --short HEAD)
 sed "s/\"app\": { \"commit\"/\"my app\": { \"commit\": \"$MYAPP\", \"date\": \"2026-01-01\" }, \"app\": { \"commit\"/; s/\"secret\": \"none\"/\"secret\": \"none\", \"my app\": \"none\"/" \
-  "$V/.engram.json" > "$WORK/tmp" && mv "$WORK/tmp" "$V/.engram.json"
+  "$V/.chickadee.json" > "$WORK/tmp" && mv "$WORK/tmp" "$V/.chickadee.json"
 note Projects/App/Listed.md '---' 'description: Lists without indent.' 'date: 2026-01-11' 'source:' '- app/docs/guide.md' \
   'code:' '- app/src/missing.ts' '---' 'Up: [[App]]'
 commit_at "$V" 2026-01-11 "docs: add Listed"
@@ -212,13 +212,27 @@ expect_line CODE_PATH_MISSING Projects/App/Listed.md
 if grep -q '^STALE.*my app' "$WORK/out"; then echo "FAIL $SCENARIO: lint looked inside a none folder"; FAILS=$((FAILS + 1))
 else echo "ok   $SCENARIO: nothing from a none folder"; fi
 expect PROJECTS_ROOT_MISSING 0
-sed 's/"projectsRoot": ".."/"projectsRoot": "..\/nowhere"/' "$V/.engram.json" > "$WORK/tmp" && mv "$WORK/tmp" "$V/.engram.json"
+sed 's/"projectsRoot": ".."/"projectsRoot": "..\/nowhere"/' "$V/.chickadee.json" > "$WORK/tmp" && mv "$WORK/tmp" "$V/.chickadee.json"
 lint 2026-01-12
 expect PROJECTS_ROOT_MISSING 1
 if grep -q "MISSING_SOURCE	Projects/App/Listed.md" "$WORK/out"; then echo "FAIL $SCENARIO: unindented source list not read"; FAILS=$((FAILS + 1))
 else echo "ok   $SCENARIO: unindented source list read"; fi
 
-# 6. The example vault shipped in examples/ must stay clean.
+# 6. A vault set up before 0.7.0 keeps its config as .engram.json: it is still read, and a
+#    .chickadee.json next to it wins. projectsRoot points nowhere here, so the finding names the file.
+SCENARIO=renamed
+mv "$V/.chickadee.json" "$V/.engram.json"
+lint 2026-01-12
+expect PROJECTS_ROOT_MISSING 1
+expect_line PROJECTS_ROOT_MISSING .engram.json
+sed 's/"projectsRoot": "..\/nowhere"/"projectsRoot": ".."/' "$V/.engram.json" > "$V/.chickadee.json"
+lint 2026-01-12
+expect PROJECTS_ROOT_MISSING 0
+expect_line PRIVACY_MISMATCH "my app"
+if grep -q 'PRIVACY_MISMATCH.*\.engram\.json' "$WORK/out"; then echo "FAIL $SCENARIO: read .engram.json next to .chickadee.json"; FAILS=$((FAILS + 1))
+else echo "ok   $SCENARIO: .chickadee.json wins over .engram.json"; fi
+
+# 7. The example vault shipped in examples/ must stay clean.
 SCENARIO=example
 sh "$LINT" "$ROOT/examples/vault" date Daily Home Log 2026-11-05 > "$WORK/out" || :
 for c in MISSING_FRONTMATTER MISSING_DESCRIPTION MISSING_DATE MISSING_SOURCE BROKEN_LINK ORPHAN NOT_IN_MOC \
@@ -226,10 +240,10 @@ for c in MISSING_FRONTMATTER MISSING_DESCRIPTION MISSING_DATE MISSING_SOURCE BRO
   expect $c 0
 done
 
-# 7. Live graph hook: one line per note read or written inside a vault whose plugin is on.
+# 8. Live graph hook: one line per note read or written inside a vault whose plugin is on.
 SCENARIO=live
 L="$WORK/live"
-LOG="$L/notes/.obsidian/plugins/engram-live/live.jsonl"
+LOG="$L/notes/.obsidian/plugins/chickadee-live/live.jsonl"
 mkdir -p "$L/notes/Projects" "$L/notes-old" "$L/app/src"
 hook() { # hook PROJECT_DIR JSON
   printf '%s' "$2" | CLAUDE_PROJECT_DIR="$1" sh "$LIVE"
@@ -265,5 +279,25 @@ head -c 1100000 /dev/zero | tr '\0' 'x' > "$LOG"
 hook "$L" "$(read_json Read "$L/notes/Home.md")"
 if [ "$(wc -c < "$LOG" | tr -d ' ')" -eq 1100000 ]; then echo "ok   $SCENARIO: no appending past 1 MB"
 else echo "FAIL $SCENARIO: appended past 1 MB"; FAILS=$((FAILS + 1)); fi
+
+# 9. The live graph plugin's folder before 0.7.0 (engram-live) is still served, next to the new one
+#    or alone, and the hook is registered only for Markdown files and searches, always in bash.
+SCENARIO=live-renamed
+OLD="$L/notes/.obsidian/plugins/engram-live/live.jsonl"
+mkdir -p "$(dirname "$OLD")"; : > "$OLD"; : > "$LOG"
+hook "$L" "$(read_json Read "$L/notes/Home.md")"
+cp "$OLD" "$WORK/out"
+expect_out '{"v":1,"tool":"Read","path":"Home.md","session":"s1"}'
+cp "$LOG" "$WORK/out"
+expect_out '{"v":1,"tool":"Read","path":"Home.md","session":"s1"}'
+rm "$LOG"; : > "$OLD"
+hook "$L/app" "$(read_json Edit "$L/notes/Projects/App.md")"
+hook "$L/app" '{"session_id":"s4","hook_event_name":"Stop"}'
+cp "$OLD" "$WORK/out"
+expect_out '{"v":1,"tool":"Edit","path":"Projects/App.md","session":"s1"}' '{"v":1,"event":"stop","session":"s4"}'
+HOOKS="$ROOT/hooks/hooks.json"
+cmds=$(grep -c '"command"' "$HOOKS"); bash=$(grep -c '"shell": "bash"' "$HOOKS"); ifs=$(grep -c '"if": "' "$HOOKS")
+if [ "$cmds" = 7 ] && [ "$bash" = 7 ] && [ "$ifs" = 6 ]; then echo "ok   $SCENARIO: hooks run in bash, tool hooks only for notes and searches"
+else echo "FAIL $SCENARIO: hooks.json has $cmds commands, $bash in bash, $ifs with if"; FAILS=$((FAILS + 1)); fi
 
 if [ "$FAILS" -eq 0 ]; then echo "all tests passed"; else echo "$FAILS failed"; exit 1; fi
