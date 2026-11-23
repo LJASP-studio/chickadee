@@ -1,7 +1,7 @@
 ---
 name: setup
-description: Set up a Chickadee vault in the current projects folder (layout, hub, MOCs, privacy per project, routing block, read-deny rules, Obsidian presets, local git). `privacy` re-runs only the privacy step; `live` adds the live graph plugin.
-argument-hint: "[tr|en] [vault-folder] | privacy | live"
+description: Set up a Chickadee vault in the current projects folder (layout, hub, MOCs, privacy per project, routing block, read-deny rules, Obsidian presets, local git). `privacy` re-runs only the privacy step; `live` adds the live graph plugin; `views` adds missing Bases views.
+argument-hint: "[tr|en] [vault-folder] | privacy | live | views"
 disable-model-invocation: true
 ---
 
@@ -9,7 +9,7 @@ disable-model-invocation: true
 
 Run from the folder that holds the projects (for example `~/code` or `D:/code`). The vault becomes a subfolder of it. Read `${CLAUDE_SKILL_DIR}/../../reference/conventions.md` first. Templates are in `${CLAUDE_SKILL_DIR}/templates/`. Use Claude's own tools (Read, Write, Edit, Glob, Grep) for files and JSON; use the shell only for `git`. Never add a git remote and never push.
 
-Arguments: `$ARGUMENTS` (optional language `tr` or `en`, optional vault folder name). If the arguments are `privacy`, find the vault (conventions), ask only items 4 and 5 of step 2, run steps 6 and 7, commit `.chickadee.json` (`chore: update privacy`) and report. If they are `live`, find the vault and run step 9 only. Whatever the arguments, if the vault found has `.engram.json` and no `.chickadee.json`, it was set up by engram, this plugin's name before 0.7.0: run step 10 first. With no arguments, stop after step 10; the vault is already set up.
+Arguments: `$ARGUMENTS` (optional language `tr` or `en`, optional vault folder name). If the arguments are `privacy`, find the vault (conventions), ask only items 4 and 5 of step 2, run steps 6 and 7, commit `.chickadee.json` (`chore: update privacy`) and report. If they are `live`, find the vault and run step 9 only. If they are `views`, find the vault and run step 11 only. Whatever the arguments, if the vault found has `.engram.json` and no `.chickadee.json`, it was set up by engram, this plugin's name before 0.7.0: run step 10 first. With no arguments, stop after step 10; the vault is already set up, but if a view from step 6 is missing in its views folder, mention `/chickadee:setup views`.
 
 ## 1. Check the place
 - The projects root is the current working directory. Run `git rev-parse --show-toplevel` there. If it is inside a git repository, the vault would be committed into that repository: stop and ask whether to use the parent folder instead.
@@ -40,7 +40,7 @@ Replace `{{today}}` with today's date and the other `{{…}}` placeholders with 
 3. Hub `<vault>/<hub>.md` from `hub.<language>.md`; log `<vault>/<log>.md` from `log.<language>.md`.
 4. One MOC per role folder from `moc.md`, named after the folder, inside it (the views and proposals folders get none). `mocDescription`: one sentence on what the folder holds. `intro`: one line. `lines`: empty for now. `up`: `Up: [[<hub>]]` (in Turkish text `Üst: [[<hub>]]`). Write `mocDescription` and `intro` in the note language.
 5. Today's daily note `<daily>/<today>.md`: frontmatter (description, date, tag `daily`), heading `# <today>`, one summary line ("Vault set up" or "Kasa kuruldu") and `Related: [[<hub>]]` (in Turkish text `İlgili:`). Add `- [[<today>]]: <description>` to the daily MOC.
-6. Bases into the views folder: `bases/decisions.base` as `Decision table.base`, `releases.base` as `Release table.base`, `orphans.base` as `Orphans.base`. Fill `{{decisions}}`, `{{releases}}` and `{{proposals}}` with the folder names.
+6. Bases into the views folder: `bases/decisions.base` as `Decision table.base`, `releases.base` as `Release table.base`, `orphans.base` as `Orphans.base`, `review.base` as `Review.base`. Fill `{{decisions}}`, `{{releases}}` and `{{proposals}}` with the folder names.
 7. `<vault>/.obsidian/`: write each of these files only if that file does not exist yet: `app.json` (`{"useMarkdownLinks": false, "alwaysUpdateLinks": true}`), `daily-notes.json` (`{"folder": "<daily>", "format": "YYYY-MM-DD"}`) and `graph.json` from the template with the folder names filled in. If `graph.json` already exists, leave it and tell the user the preset is at `${CLAUDE_SKILL_DIR}/templates/graph.json`; Obsidian overwrites graph.json on exit, so it must be edited with Obsidian closed.
 8. `<vault>/.gitignore` from `templates/gitignore`.
 
@@ -80,3 +80,9 @@ The vault has `.engram.json` and no `.chickadee.json`. Its notes, privacy levels
 4. Edit the routing block as planned. A `CLAUDE.md` with no block is left alone; mention that step 5 can add one.
 5. Run step 9 if the plan included it.
 6. Report in two or three lines what changed, and that no note was touched.
+
+## 11. Views (`views` only)
+Vaults set up before 0.8.0 lack the review table and a decision table that shows `status`.
+1. Write each file of step 6 that is missing in the views folder, filled in as step 6 says.
+2. If `Decision table.base` exists and has no `note.status`, show the shipped version next to it and offer to replace it; the user may have changed it, so replace only on a yes.
+3. Commit only the files written: `git -C <vault> add -- <paths>`, then `git -C <vault> commit -m "chore: add vault views"`. Report the files in one line.

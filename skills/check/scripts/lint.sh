@@ -15,10 +15,13 @@
 # Output: one finding per line, "CHECK<TAB>path<TAB>detail", then "SUMMARY<TAB>CHECK<TAB>count".
 # Errors:   MISSING_FRONTMATTER MISSING_DESCRIPTION MISSING_DATE MISSING_SOURCE BROKEN_LINK
 #           ORPHAN NOT_IN_MOC NOT_IN_DAILY CODE_PATH_MISSING PROJECTS_ROOT_MISSING
+#           SUPERSEDED_BY_BROKEN
 # Warnings: NO_MOC DUPLICATE_NAME LIKELY_DUPLICATE STALE INFERRED_UNMARKED PROPOSAL_PENDING
 #           PRIVACY_UNSET PRIVACY_MISMATCH PRIVACY_NONE_NOTES DAILY_CHECK_SKIPPED
-#           DAILY_CHECK_BY_DATE
-# Counts:   INFERRED (decisions waiting for confirmation), NOTES
+#           DAILY_CHECK_BY_DATE STATUS_UNKNOWN SUPERSEDED_NO_TARGET SUPERSEDED_BY_MISMATCH
+#           LIFECYCLE_NOT_IN_DESCRIPTION REVIEW_DUE STALE_AFTER_INVALID
+# Counts:   INFERRED (decisions waiting for confirmation), RETIRED (superseded or deprecated
+#           notes), NOTES
 # Exit status: 0 when there are no errors, 1 when there are, 2 on bad usage.
 
 set -eu
@@ -259,6 +262,9 @@ function scan(f,   line, n, fm, code, raw, t, target, d, desc, k, v, cur) {
         if (d ~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$/) { hasdate[f] = 1; notedate[f] = d }
       }
       if (k == "confidence") confidence[f] = unquote(v)
+      if (k == "status") status[f] = tolower(unquote(v))
+      if (k == "superseded_by") { v = unquote(v); sub(/^\[\[/, "", v); sub(/\]\]$/, "", v); sub(/\|.*/, "", v); sub(/#.*/, "", v); supby[f] = trim(v) }
+      if (k == "stale_after") staleafter[f] = unquote(v)
       if (k == "tags" || k == "source" || k == "code") { if (v == "") cur = k; else additems(f, k, v) }
       continue
     }
@@ -280,6 +286,11 @@ function scan(f,   line, n, fm, code, raw, t, target, d, desc, k, v, cur) {
   }
   close(f)
   ismoc[f] = ((f, "moc") in tag)
+  retired[f] = (status[f] == "superseded" || status[f] == "deprecated")
+  if (supby[f] != "") {
+    target = resolve(supby[f])
+    if (target != "" && target != "@file") { suptarget[f] = target; if (!((f, target) in linked)) { linked[f, target] = 1; inbound[target]++ } }
+  }
 }
 # Longest scanned or privacy-listed project folder that contains path p, or "".
 function projectof(p,   k, best) {
@@ -375,6 +386,7 @@ BEGIN {
   # or the same normalised description anywhere.
   for (i = 1; i <= n; i++) {
     f = note[i]; t = stem(f); sub(/^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] /, "", t)
+    if (retired[f]) continue   # an old decision may share its title with the one that replaced it
     k = dir(f) SUBSEP norm(t)
     if (norm(t) != "" && k in seentitle) report("LIKELY_DUPLICATE", f, "title like " seentitle[k])
     else seentitle[k] = f
@@ -433,6 +445,7 @@ BEGIN {
     close(ntimesf)
     for (i = 1; i <= n; i++) {
       f = note[i]; newest = 0; what = ""
+      if (retired[f]) continue
       written = (f in ntime) ? ntime[f] : 0
       for (j = 1; j <= nitems[f, "code"]; j++) {
         p = items[f, "code", j]; sub(/^\.\//, "", p)
@@ -479,6 +492,29 @@ BEGIN {
     report("PROJECTS_ROOT_MISSING", cfgname, "projectsRoot " ENVIRON["CHICKADEE_ROOT_SET"] " is not a folder: code paths, staleness and privacy were not checked")
   }
 
+  # Decision lifecycle: status, superseded_by and stale_after.
+  for (i = 1; i <= n; i++) {
+    f = note[i]
+    if (!hasfm[f]) continue
+    s = status[f]
+    if (s != "" && s != "proposed" && s != "accepted" && s != "deprecated" && s != "superseded")
+      report("STATUS_UNKNOWN", f, "status " s ": use proposed, accepted, deprecated or superseded")
+    if (retired[f]) retiredn++
+    if (supby[f] != "") {
+      if (!(f in suptarget)) report("SUPERSEDED_BY_BROKEN", f, "[[" supby[f] "]] is not a note")
+      else if (suptarget[f] == f) report("SUPERSEDED_BY_BROKEN", f, "points to itself")
+      if (s != "superseded") report("SUPERSEDED_BY_MISMATCH", f, "superseded_by without status: superseded")
+    } else if (s == "superseded") report("SUPERSEDED_NO_TARGET", f, "status superseded without superseded_by")
+    d = unquote(description[f])
+    if (s == "superseded" && d !~ /^(Superseded by|Yerini) /) report("LIFECYCLE_NOT_IN_DESCRIPTION", f, "start the description with: Superseded by <title>: (tr: Yerini <title> aldı:)")
+    if (s == "deprecated" && d !~ /^(Deprecated|Geçersiz)[:.]/) report("LIFECYCLE_NOT_IN_DESCRIPTION", f, "start the description with: Deprecated: (tr: Geçersiz:)")
+    if (f in staleafter) {
+      sa = staleafter[f]
+      if (sa !~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$/) report("STALE_AFTER_INVALID", f, "stale_after " sa " is not YYYY-MM-DD")
+      else if (sa < today && !retired[f]) report("REVIEW_DUE", f, "stale_after " sa " has passed: review the note, then move or remove the date")
+    }
+  }
+
   # Daily note coverage.
   getline mode < modef; close(modef)
   dailynote = daily "/" today ".md"
@@ -497,13 +533,14 @@ BEGIN {
   }
 
   errors = 0
-  nerr = split("MISSING_FRONTMATTER MISSING_DESCRIPTION MISSING_DATE MISSING_SOURCE BROKEN_LINK ORPHAN NOT_IN_MOC NOT_IN_DAILY CODE_PATH_MISSING PROJECTS_ROOT_MISSING", checks, " ")
-  nall = split("MISSING_FRONTMATTER MISSING_DESCRIPTION MISSING_DATE MISSING_SOURCE BROKEN_LINK ORPHAN NOT_IN_MOC NOT_IN_DAILY CODE_PATH_MISSING PROJECTS_ROOT_MISSING NO_MOC DUPLICATE_NAME LIKELY_DUPLICATE STALE INFERRED_UNMARKED PROPOSAL_PENDING PRIVACY_UNSET PRIVACY_MISMATCH PRIVACY_NONE_NOTES DAILY_CHECK_SKIPPED DAILY_CHECK_BY_DATE", checks, " ")
+  nerr = split("MISSING_FRONTMATTER MISSING_DESCRIPTION MISSING_DATE MISSING_SOURCE BROKEN_LINK ORPHAN NOT_IN_MOC NOT_IN_DAILY CODE_PATH_MISSING PROJECTS_ROOT_MISSING SUPERSEDED_BY_BROKEN", checks, " ")
+  nall = split("MISSING_FRONTMATTER MISSING_DESCRIPTION MISSING_DATE MISSING_SOURCE BROKEN_LINK ORPHAN NOT_IN_MOC NOT_IN_DAILY CODE_PATH_MISSING PROJECTS_ROOT_MISSING SUPERSEDED_BY_BROKEN NO_MOC DUPLICATE_NAME LIKELY_DUPLICATE STALE INFERRED_UNMARKED PROPOSAL_PENDING PRIVACY_UNSET PRIVACY_MISMATCH PRIVACY_NONE_NOTES DAILY_CHECK_SKIPPED DAILY_CHECK_BY_DATE STATUS_UNKNOWN SUPERSEDED_NO_TARGET SUPERSEDED_BY_MISMATCH LIFECYCLE_NOT_IN_DESCRIPTION REVIEW_DUE STALE_AFTER_INVALID", checks, " ")
   for (i = 1; i <= nall; i++) {
     printf "SUMMARY\t%s\t%d\n", checks[i], count[checks[i]] + 0
     if (i <= nerr) errors += count[checks[i]]
   }
   printf "SUMMARY\tINFERRED\t%d\n", inferred + 0
+  printf "SUMMARY\tRETIRED\t%d\n", retiredn + 0
   printf "SUMMARY\tNOTES\t%d\n", n
   exit errors > 0 ? 1 : 0
 }

@@ -1,0 +1,61 @@
+filters:
+  and:
+    - file.ext == "md"
+views:
+  - type: table
+    name: "Superseded or deprecated"
+    filters:
+      or:
+        - note.status == "superseded"
+        - note.status == "deprecated"
+    order:
+      - file.name
+      - note.status
+      - note.superseded_by
+      - note.date
+    sort:
+      - property: note.date
+        direction: DESC
+  - type: table
+    name: "Review due"
+    filters:
+      and:
+        - note.stale_after
+        - date(note.stale_after) <= today()
+    order:
+      - file.name
+      - note.stale_after
+      - note.description
+    sort:
+      - property: note.stale_after
+        direction: ASC
+  - type: table
+    name: "Inferred decisions"
+    filters:
+      and:
+        - note.confidence == "inferred"
+    order:
+      - file.name
+      - note.date
+      - note.description
+  - type: table
+    name: "Proposals"
+    filters:
+      and:
+        - file.inFolder("Proposals")
+    order:
+      - file.name
+      - note.proposal_for
+      - note.date
+  - type: table
+    name: "Status notes"
+    filters:
+      and:
+        - file.hasTag("status")
+    order:
+      - file.name
+      - note.date
+      - file.folder
+    sort:
+      - property: note.date
+        direction: DESC

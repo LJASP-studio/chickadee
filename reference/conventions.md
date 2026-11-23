@@ -83,9 +83,33 @@ Related: [[Project hub]] · [[Other note]]
 - `code`: optional list of files or folders the note describes, relative to the projects root, forward slashes. This is what lets Claude jump straight to the right files. Every path must exist; `/chickadee:check` reports the ones that do not.
 - `confidence: inferred`: on a decision whose only sources are commits or tags (the reason was read from commit messages). It stays until the user confirms the decision; then it becomes `confidence: confirmed`.
 - `visibility: internal`: on notes about a `structure` project.
+- `status`, `superseded_by`, `stale_after`: optional, for a note that is no longer current or should be looked at again by a date (Decision lifecycle).
 - Titles are short, specific and safe to show anyone. File name = title + `.md`. Decisions start with the date: `2026-03-14 Sessions move to Redis.md`. Releases: `<Project> vX.Y.Z.md`.
 - Body: plain wikilinks `[[Note]]`, never Markdown links to notes. Each content note links to at least its project hub or folder MOC and one related note. MOCs, daily notes, the hub and the log only need their up-link.
 - Never write secrets, tokens, passwords, `.env` values, customer data or personal data. Never copy whole files; summarise and point to the path.
+
+## Decision lifecycle
+
+A decision can be replaced or dropped later, and some facts hold only until a date. Three optional keys say so; a note without them is current. They go after `tags`, so `description` and `code` stay at the top.
+
+```markdown
+---
+description: "Superseded by 2026-05-02 Sessions move to Postgres: sessions lived in Redis with a 24-hour expiry."
+date: 2026-03-14
+source: api/docs/adr/0004-redis-sessions.md
+code: [api/src/session/]
+tags: [decision]
+status: superseded
+superseded_by: "[[2026-05-02 Sessions move to Postgres]]"
+---
+```
+
+- `status`: `proposed` (not decided yet), `accepted` (the default, rarely written), `deprecated` (no longer holds and nothing replaced it: reverted, dropped, withdrawn) or `superseded` (a later note replaced it).
+- `superseded_by`: the note that replaced this one, as a quoted link `"[[Title]]"`. Only with `status: superseded`. When that note is replaced in turn, it says so itself; older pointers stay as they are, so the chain can be followed.
+- `stale_after`: `YYYY-MM-DD`, the day after which the note should be reviewed (a temporary workaround, a beta, a price, a deadline). Once it passes, `/chickadee:check` warns. After a review, move the date or remove the key.
+- The description says it first, because the description grep is what Claude sees: `Superseded by <title of the new note>: …` or `Deprecated: …`; in a Turkish vault `Yerini <title> aldı: …` or `Geçersiz: …`. Put the description in double quotes, since the prefix adds a colon. Keep the rest of the description and the body: the history is still worth reading.
+- The new note links the old one in its body, so the reason for the change is one click away.
+- A superseded or deprecated note is not checked for staleness; its code may change without it.
 
 ## Layout
 
@@ -96,7 +120,7 @@ Related: [[Project hub]] · [[Other note]]
 - Tech notes: one per tool or framework, shared by all projects that use it. They link every project that uses them; these cross-project hubs are what make the graph look like a brain.
 - Concept notes: one per theme that cuts across projects and folders (a principle, a quality such as security or privacy, a technique such as determinism or localisation). Write one only when notes in two or more projects already show the theme. The body says in two or three sentences what the theme means here, then lists the notes that show it, grouped by project, one line each with what that note adds. `source` lists the sources of those notes; `code` lists the main paths; tag `concept`. A vault older than this rule may lack the concepts folder: add it to `.chickadee.json` and create its MOC before writing the first concept note.
 - Daily note: `<daily>/YYYY-MM-DD.md`, tag `daily`, heading `# YYYY-MM-DD`, a one- or two-line summary and a `Related:` line linking every note written or changed that day.
-- Views: the views folder holds Obsidian Bases tables (decision table, release table, orphans) and no notes.
+- Views: the views folder holds Obsidian Bases tables (decision table, release table, orphans, review) and no notes. The review table lists what needs a look: superseded and deprecated notes, notes past `stale_after`, inferred decisions, pending proposals and status notes.
 - Proposals: the proposals folder holds proposed changes to notes the user edited (see Your edits). No MOC; the check lists them.
 - Log: `<log>.md` at the root. Append only, one line per change, plain text (no wikilinks, so it does not become a giant graph node):
   `- 2026-03-14 decision | 2026-03-14 Sessions move to Redis`
@@ -120,7 +144,7 @@ Chickadee never overwrites text the user wrote. It tells the user's text from it
 - `sh <skills>/scan/scripts/edited.sh <vault> [note ...]` prints those notes; give notes as paths relative to the vault (absolute paths inside it work too). It exits with 2 and names any path it cannot find: fix the path and run it again, never read silence as "not edited". Without a shell, run `git -C <vault> status --porcelain -- <note>` and `git -C <vault> log --follow --format=%s -- <note>` and apply the same rule.
 - Check right before writing, after the snapshot: the user may have edited a note while a plan waited for an OK. Read the note again just before changing it.
 
-On a note with the user's edits, a skill may only make these changes: add a line to an index or a `Related:` line; add an item to `source` or `code`; add a dated line to a status note, or remove an item there that the current task finished or answered; add words to the end of a daily note's summary; set `date`, `confidence` or `visibility`; keep an index line's description equal to its note's description; point a link at a note's new name after a rename, move or merge. Anything else that rewords, moves or removes text goes to a proposal instead:
+On a note with the user's edits, a skill may only make these changes: add a line to an index or a `Related:` line; add an item to `source` or `code`; add a dated line to a status note, or remove an item there that the current task finished or answered; add words to the end of a daily note's summary; set `date`, `confidence`, `visibility`, `status`, `superseded_by` or `stale_after`; put the lifecycle prefix (Decision lifecycle) at the start of `description`; keep an index line's description equal to its note's description; point a link at a note's new name after a rename, move or merge. Anything else that rewords, moves or removes text goes to a proposal instead:
 
 - File `<proposals>/<Title>.proposal.md` (one per note) from `proposal.md` in the setup templates: frontmatter with `description`, `date`, `proposal_for: <vault path of the note>`, the new `source` items and tag `proposal`; a line on why; a short list of the changes; the full proposed note inside a `~~~~markdown` fence, so its links stay out of the graph. If a proposal for the note is already waiting, the new one starts from it and keeps its changes that still apply.
 - Log line `- <today> proposal | <Title>`. The note itself is not touched.

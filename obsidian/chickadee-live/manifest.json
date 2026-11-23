@@ -1,7 +1,7 @@
 {
   "id": "chickadee-live",
   "name": "Chickadee live graph",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "minAppVersion": "1.15.0",
   "description": "Lights up notes in the graph view while Claude Code reads or writes them. Works with the Chickadee Claude Code plugin. No network access.",
   "author": "muazfurkan",

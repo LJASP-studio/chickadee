@@ -53,6 +53,8 @@ claude plugin update chickadee@chickadee
 
 Then run `/reload-plugins` or restart Claude Code. If you use the live graph, run `/chickadee:setup live` again to update the Obsidian plugin.
 
+A vault set up before 0.8.0 has no review table and a decision table without the status column: `/chickadee:setup views` adds the missing views and asks before it replaces the decision table.
+
 To get updates without these commands, open `/plugin`, go to Marketplaces, choose chickadee and turn on auto-update. It is off by default for plugins outside Anthropic's own marketplace.
 
 ## Moving over from engram

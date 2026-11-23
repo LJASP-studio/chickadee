@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.0 - 2026-11-24
+
+- Decisions that no longer hold say so. A note can carry `status` (`proposed`, `accepted`, `deprecated`, `superseded`), `superseded_by` (a link to the note that replaced it) and `stale_after` (a date to look at it again). A replaced note's description starts with "Superseded by <new note>:" (in Turkish "Yerini <new note> aldı:"), so the first search already shows Claude it is out of date. The routing block is unchanged. All three keys are optional; vaults without them work as before.
+- `/chickadee:note` marks the decision a new one replaces, and after a task it looks up the notes whose `code:` lists the files the task changed (new helper `skills/note/scripts/touched.sh`), corrects the ones that are now wrong and records the review on the ones that are still right. Tech and concept notes, hubs, release, research, daily and status notes are left out, since they record a moment or list many paths.
+- `/chickadee:check` checks the new keys: a `superseded_by` that names no note is an error; an unknown status, a superseded note without a target, a description that does not say the note is out of date and a passed `stale_after` are warnings. Superseded and deprecated notes are no longer reported as stale, and its duplicate pass also looks for decisions a later note replaced.
+- Views: the decision table has a "Current" view without superseded and deprecated decisions and an "All" view with their status, and a new review table lists superseded notes, notes past their review date, inferred decisions, pending proposals and status notes. `/chickadee:setup views` adds them to an existing vault; it replaces an existing decision table only on a yes.
+- The example vault has a decision that a later one replaced.
+
 ## 0.7.0 - 2026-11-23
 
 - engram is now Chickadee. The plugin and its marketplace are `chickadee`, the commands `/chickadee:setup`, `/chickadee:scan`, `/chickadee:note` and `/chickadee:check`, and the repository github.com/LJASP-studio/chickadee; old links redirect. To move an engram install over, see "Moving over from engram" in `docs/install.md`.

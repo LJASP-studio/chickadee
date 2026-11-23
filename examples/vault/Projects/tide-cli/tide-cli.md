@@ -13,6 +13,8 @@ Prints tide times for a harbour. Written in [[Go]] 1.23 with the standard librar
 - [[tide command]]: `cmd/tide/main.go`, the entry point.
 - [[forecast package]]: `internal/forecast/`, the tide lookup.
 
+Decisions: [[2026-02-16 tide-cli reads a public tide table]] (replaced [[2026-02-02 tide-cli reads the harbour web page]])
+
 Releases: [[tide-cli 1.0.0]]
 
 Status: [[tide-cli status]]

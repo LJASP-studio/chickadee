@@ -13,7 +13,7 @@ Claude Code forgets your projects between sessions. Chickadee gives it a memory:
 - More from cheaper models. With the vault, Haiku answered a set of 20 questions as fully as Opus, at about a fortieth of the cost.
 - A graph that shows Claude at work. The optional live graph (`/chickadee:setup live`) lights up the notes Claude reads and edits in Obsidian, while it works.
 - Control over what is read. You choose per project what Claude may read, nothing leaves your machine through Chickadee, and your own notes are never overwritten: changes to them come as proposals you accept or drop.
-- Notes you can trust. Every note cites its source and date, and `/chickadee:check` flags missing sources, broken links and notes whose code has changed since.
+- Notes you can trust. Every note cites its source and date. A decision that was replaced says so in its first line and points to the one that replaced it. When a task is done, Chickadee looks at the notes about the files you changed, and `/chickadee:check` flags missing sources, broken links and notes whose code has changed since.
 
 ## Get started
 

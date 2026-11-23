@@ -6,10 +6,26 @@ filters:
         - file.hasTag("moc")
 views:
   - type: table
-    name: "{{decisions}}"
+    name: "Current"
+    filters:
+      and:
+        - note.status != "superseded"
+        - note.status != "deprecated"
     order:
       - file.name
       - note.date
+      - note.status
+      - note.description
+    sort:
+      - property: note.date
+        direction: DESC
+  - type: table
+    name: "All"
+    order:
+      - file.name
+      - note.date
+      - note.status
+      - note.superseded_by
       - note.description
     sort:
       - property: note.date

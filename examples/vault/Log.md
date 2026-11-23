@@ -12,3 +12,5 @@ Format: `- YYYY-MM-DD type | Title`. Plain text on purpose, so the log does not 
 - 2026-11-05 module | Inkwell editor engine
 - 2026-11-05 concept | Network access
 - 2026-11-05 maintenance | TypeScript: description added, broken link fixed, added to Tech index, linked from Inkwell
+- 2026-11-05 decision | 2026-02-02 tide-cli reads the harbour web page
+- 2026-11-05 decision | 2026-02-16 tide-cli reads a public tide table

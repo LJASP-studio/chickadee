@@ -1,5 +1,6 @@
 #!/bin/sh
-# Tests for skills/check/scripts/lint.sh, skills/scan/scripts/edited.sh and hooks/live.sh on synthetic vaults.
+# Tests for skills/check/scripts/lint.sh, skills/scan/scripts/edited.sh, skills/note/scripts/touched.sh
+# and hooks/live.sh on synthetic vaults.
 # POSIX sh; needs git. Usage: sh tests/run.sh
 
 set -eu
@@ -236,9 +237,95 @@ else echo "ok   $SCENARIO: .chickadee.json wins over .engram.json"; fi
 SCENARIO=example
 sh "$LINT" "$ROOT/examples/vault" date Daily Home Log 2026-11-05 > "$WORK/out" || :
 for c in MISSING_FRONTMATTER MISSING_DESCRIPTION MISSING_DATE MISSING_SOURCE BROKEN_LINK ORPHAN NOT_IN_MOC \
-         CODE_PATH_MISSING NO_MOC LIKELY_DUPLICATE INFERRED_UNMARKED PRIVACY_UNSET PRIVACY_MISMATCH; do
+         CODE_PATH_MISSING NO_MOC LIKELY_DUPLICATE INFERRED_UNMARKED PRIVACY_UNSET PRIVACY_MISMATCH \
+         SUPERSEDED_BY_BROKEN STATUS_UNKNOWN SUPERSEDED_NO_TARGET SUPERSEDED_BY_MISMATCH \
+         LIFECYCLE_NOT_IN_DESCRIPTION REVIEW_DUE STALE_AFTER_INVALID; do
   expect $c 0
 done
+expect RETIRED 1
+
+# 7b. Decision lifecycle: status, superseded_by and stale_after. Old vaults have none of these
+#     keys and must report nothing new (scenarios 1-7 above).
+SCENARIO=lifecycle
+V="$WORK/life"
+note Home.md '---' 'description: Entry point.' 'date: 2026-01-01' 'tags: [moc]' '---' '- [[Decisions]] · [[Log]]'
+note Log.md '---' 'description: Change log.' 'date: 2026-01-01' '---' 'Up: [[Home]]'
+note Decisions/Decisions.md '---' 'description: Decisions index.' 'date: 2026-01-01' 'tags: [moc]' '---' \
+  '- [[2026-01-01 Redis]] · [[2026-02-01 Postgres]] · [[2026-03-01 Sqlite]] · [[2026-01-05 Tabs]] · [[2026-01-06 Beta]]' \
+  '- [[2026-01-07 Odd]] · [[2026-01-08 Lost]] · [[2026-01-09 Loose]] · [[2026-01-10 Typo]] · [[2026-01-11 Geri]]' \
+  '- [[2026-01-12 Sessions in Redis]] · [[2026-01-13 Self]] · [[2026-01-01 Redis copy]]' 'Up: [[Home]]'
+dec() { # dec TITLE DESCRIPTION EXTRA-FRONTMATTER-LINE...
+  t=$1; d=$2; shift 2
+  note "Decisions/$t.md" '---' "description: $d" 'date: 2026-01-01' 'source: [docs/adr.md]' 'tags: [decision]' "$@" '---' 'Up: [[Decisions]]'
+}
+dec "2026-01-01 Redis" "Superseded by 2026-02-01 Postgres: sessions in Redis." 'status: superseded' 'superseded_by: "[[2026-02-01 Postgres]]"'
+dec "2026-02-01 Postgres" "Superseded by 2026-03-01 Sqlite: sessions in Postgres." 'status: superseded' 'superseded_by: "[[2026-03-01 Sqlite|the new one]]"'
+dec "2026-03-01 Sqlite" "Sessions in SQLite." 'status: accepted' 'stale_after: 2026-12-31'
+dec "2026-01-05 Tabs" "Geçersiz: girinti sekmeyle yapılırdı." 'status: deprecated' 'stale_after: 2026-01-02'
+dec "2026-01-06 Beta" "The beta flag stays on until launch." "stale_after: '2026-01-02'"
+dec "2026-01-07 Odd" "An odd status." 'status: Draft'
+dec "2026-01-08 Lost" "Superseded by nothing that exists." 'status: superseded' 'superseded_by: "[[2026-09-09 Nowhere]]"'
+dec "2026-01-09 Loose" "Points on but keeps its status." 'superseded_by: 2026-03-01 Sqlite'
+dec "2026-01-10 Typo" "Forgot to say it was replaced." 'status: superseded' 'superseded_by: "[[2026-03-01 Sqlite]]"' 'stale_after: soon'
+dec "2026-01-11 Geri" "Yerini 2026-03-01 Sqlite aldı: oturumlar dosyadaydı." 'status: superseded'
+dec "2026-01-12 Sessions in Redis" "Deprecated: an older note on the same subject." 'status: deprecated'
+dec "2026-01-13 Self" "Superseded by 2026-01-13 Self: loops." 'status: superseded' 'superseded_by: "[[2026-01-13 Self]]"'
+note "Decisions/2026-01-01 Redis copy.md" '---' 'description: Superseded by 2026-02-01 Postgres: sessions in Redis.' 'date: 2026-01-01' \
+  'tags: [decision]' 'status: superseded' 'superseded_by: "[[2026-02-01 Postgres]]"' '---' 'Up: [[Decisions]]'
+lint 2026-06-01
+expect SUPERSEDED_BY_BROKEN 2
+expect_line SUPERSEDED_BY_BROKEN "Decisions/2026-01-08 Lost.md"
+expect_line SUPERSEDED_BY_BROKEN "Decisions/2026-01-13 Self.md"
+expect STATUS_UNKNOWN 1
+expect_line STATUS_UNKNOWN "Decisions/2026-01-07 Odd.md"
+expect SUPERSEDED_NO_TARGET 1
+expect_line SUPERSEDED_NO_TARGET "Decisions/2026-01-11 Geri.md"
+expect SUPERSEDED_BY_MISMATCH 1
+expect_line SUPERSEDED_BY_MISMATCH "Decisions/2026-01-09 Loose.md"
+expect LIFECYCLE_NOT_IN_DESCRIPTION 1
+expect_line LIFECYCLE_NOT_IN_DESCRIPTION "Decisions/2026-01-10 Typo.md"
+expect REVIEW_DUE 1
+expect_line REVIEW_DUE "Decisions/2026-01-06 Beta.md"
+expect STALE_AFTER_INVALID 1
+expect_line STALE_AFTER_INVALID "Decisions/2026-01-10 Typo.md"
+expect RETIRED 9
+expect LIKELY_DUPLICATE 0
+expect ORPHAN 0
+expect BROKEN_LINK 0
+lint 2027-01-01
+expect REVIEW_DUE 2
+expect_line REVIEW_DUE "Decisions/2026-03-01 Sqlite.md"
+
+# 7c. touched.sh: which notes cite the files a piece of work changed.
+SCENARIO=touched
+TOUCHED="$ROOT/skills/note/scripts/touched.sh"
+TW="$WORK/tw"; V="$TW/notes"
+mkdir -p "$TW/app/src/auth" "$TW/app/docs"
+printf 'x\n' > "$TW/app/src/auth/login.ts"; printf 'x\n' > "$TW/app/src/auth/token.ts"; printf 'x\n' > "$TW/app/docs/guide.md"
+note .chickadee.json '{ "version": 1, "projectsRoot": "..", "folders": { "proposals": "Ideas" } }'
+note Projects/App/App.md '---' 'description: Hub.' 'code: [app/src/auth/login.ts]' 'tags: [project]' '---'
+note Projects/App/Overview.md '---' 'description: Overview.' 'code: [app/src/, app/docs/]' '---'
+note Tech/TypeScript.md '---' 'description: Tech.' 'code: [app/src/auth/login.ts]' '---'
+note Projects/App/Auth.md '---' 'description: Auth.' 'code:' '  - app/src/auth' '  - "app/docs/guide.md"' '---'
+note Projects/App/Login.md '---' 'description: Login.' 'code: [app/src/auth/login.ts]' '---'
+note Projects/App/Old login.md '---' 'description: Superseded by Login: old.' 'code: [app/src/auth/login.ts]' 'status: superseded' '---'
+note Projects/App/Other.md '---' 'description: Other.' 'code: [app/src/authz/]' '---'
+note Releases/App 1.0.md '---' 'description: Release.' 'code: [app/src/auth/login.ts]' 'tags: [release]' '---'
+note Projects/Projects.md '---' 'description: Index.' 'code: [app/]' 'tags: [moc]' '---'
+note Ideas/Login.proposal.md '---' 'description: Proposal.' 'code: [app/src/auth/login.ts]' '---'
+sh "$TOUCHED" "$V" app/src/auth/login.ts > "$WORK/out"
+expect_out "Projects/App/Login.md	app/src/auth/login.ts	app/src/auth/login.ts" \
+  "Projects/App/Auth.md	app/src/auth	app/src/auth/login.ts" "Projects/App/Overview.md	app/src	app/src/auth/login.ts"
+sh "$TOUCHED" "$V" "$TW/app/src/auth/" ./app/docs/guide.md > "$WORK/out"
+expect_out "Projects/App/Login.md	app/src/auth/login.ts	app/src/auth" \
+  "Projects/App/Auth.md	app/docs/guide.md	app/docs/guide.md" "Projects/App/Overview.md	app/docs	app/docs/guide.md"
+sh "$TOUCHED" "$V" app/README.md > "$WORK/out"
+if [ ! -s "$WORK/out" ]; then echo "ok   $SCENARIO: nothing for an uncited file"; else echo "FAIL $SCENARIO: printed notes for an uncited file"; FAILS=$((FAILS + 1)); fi
+mv "$V/.chickadee.json" "$V/.engram.json"
+sh "$TOUCHED" "$V" app/src/auth/token.ts > "$WORK/out"
+expect_out "Projects/App/Auth.md	app/src/auth	app/src/auth/token.ts" "Projects/App/Overview.md	app/src	app/src/auth/token.ts"
+if sh "$TOUCHED" "$V" > /dev/null 2>&1; then echo "FAIL $SCENARIO: no paths should exit 2"; FAILS=$((FAILS + 1))
+else echo "ok   $SCENARIO: no paths exits 2"; fi
 
 # 8. Live graph hook: one line per note read or written inside a vault whose plugin is on.
 SCENARIO=live
