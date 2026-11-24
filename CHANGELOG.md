@@ -3,7 +3,7 @@
 ## 0.8.1 - 2026-11-24
 
 - The status note templates wrote a description with an unquoted `: `, which YAML cannot read, so Obsidian and Bases showed every status note without properties. The templates and the example vault now quote it, and the conventions say when a value needs quotes.
-- `/chickadee:check` warns about frontmatter values YAML cannot read (`YAML_INVALID`: an unquoted `: `, a value that starts with `@` or a backtick, text after a closing quote, a bracket inside a flow list item) and its fix quotes them.
+- `/chickadee:check` warns about frontmatter values YAML cannot read (`YAML_INVALID`: an unquoted `: `, a value that starts with `@` or a backtick, text after a closing quote, a bracket inside a flow list item) and its fix quotes them in a commit of its own (`chore: fix frontmatter`), which the staleness check does not count as a review.
 - `/chickadee:setup views` also points out a view that filters on a folder the vault no longer has.
 
 ## 0.8.0 - 2026-11-24

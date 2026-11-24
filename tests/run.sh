@@ -156,6 +156,10 @@ expect CODE_PATH_MISSING 1
 expect_line CODE_PATH_MISSING "Projects/App/Old module.md"
 expect STALE 1
 expect_line STALE Projects/App/App.md
+sed 's/^description: The app hub\.$/description: "The app hub."/' "$V/Projects/App/App.md" > "$WORK/hub" && mv "$WORK/hub" "$V/Projects/App/App.md"
+commit_at "$V" 2026-01-04 "chore: fix frontmatter"
+lint 2026-01-05
+expect STALE 1
 expect INFERRED_UNMARKED 1
 expect_line INFERRED_UNMARKED "Decisions/2026-01-01 Tabs.md"
 expect INFERRED 1

@@ -170,12 +170,13 @@ if [ -n "$ROOTDIR" ]; then
   done < "$TMP/scanned" > "$TMP/changes"
 
   # When each note was last committed to the vault; uncommitted notes count as written now.
+  # Commits titled "chore: fix frontmatter" only change how values are written, so they are no review.
   if [ "$ISREPO" = 1 ]; then
     { git -c core.quotePath=false diff --name-only HEAD -- '*.md' 2>/dev/null |
         awk '{ print $0 "\t99999999999" }'
       git -c core.quotePath=false ls-files --others --exclude-standard -- '*.md' |
         awk '{ print $0 "\t99999999999" }'
-      git -c core.quotePath=false log --format=@%ct --name-only -- '*.md' 2>/dev/null |
+      git -c core.quotePath=false log --invert-grep --grep='^chore: fix frontmatter' --format=@%ct --name-only -- '*.md' 2>/dev/null |
         awk '/^@/ { t = substr($0, 2); next } NF { print $0 "\t" t }'
     } | awk -F "$TAB" '!($1 in seen) { seen[$1] = 1; print }' > "$TMP/ntimes"
   fi
