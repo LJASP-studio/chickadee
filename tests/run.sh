@@ -239,7 +239,7 @@ sh "$LINT" "$ROOT/examples/vault" date Daily Home Log 2026-11-05 > "$WORK/out" |
 for c in MISSING_FRONTMATTER MISSING_DESCRIPTION MISSING_DATE MISSING_SOURCE BROKEN_LINK ORPHAN NOT_IN_MOC \
          CODE_PATH_MISSING NO_MOC LIKELY_DUPLICATE INFERRED_UNMARKED PRIVACY_UNSET PRIVACY_MISMATCH \
          SUPERSEDED_BY_BROKEN STATUS_UNKNOWN SUPERSEDED_NO_TARGET SUPERSEDED_BY_MISMATCH \
-         LIFECYCLE_NOT_IN_DESCRIPTION REVIEW_DUE STALE_AFTER_INVALID; do
+         LIFECYCLE_NOT_IN_DESCRIPTION REVIEW_DUE STALE_AFTER_INVALID YAML_INVALID; do
   expect $c 0
 done
 expect RETIRED 1
@@ -295,6 +295,27 @@ expect BROKEN_LINK 0
 lint 2027-01-01
 expect REVIEW_DUE 2
 expect_line REVIEW_DUE "Decisions/2026-03-01 Sqlite.md"
+
+# 7b2. Frontmatter values YAML cannot read: Obsidian then shows the note without properties.
+SCENARIO=yaml
+V="$WORK/yaml"
+note Home.md '---' 'description: Entry point.' 'date: 2026-01-01' 'tags: [moc]' '---' \
+  '- [[Colon]] · [[Quoted]] · [[Tail]] · [[At]] · [[Bracket]] · [[Item]] · [[Fine]] · [[Single]]' 'Up: [[Log]]'
+note Log.md '---' 'description: Change log.' 'date: 2026-01-01' '---' 'Up: [[Home]]'
+y() { t=$1; shift; note "$t.md" '---' "$@" 'date: 2026-01-01' 'source: [docs/a.md]' '---' 'Up: [[Home]]'; }
+y Colon 'description: Where it stands: now and next.'
+y Quoted 'description: "Where it stands: now and next, with a \"quote\"."'
+y Tail 'description: "Superseded by X" and more.'
+y At 'description: @mention first.'
+y Bracket 'description: Routes.' 'code: [src/pages/[...path].astro, src/a.ts]'
+y Item 'description: Items.' 'code:' '  - "src/b.ts"' '  - note: a mapping'
+y Fine 'description: Plain text, a URL https://example.com/a?b=c and a time 10:30.' 'code: [src/a.ts, "src/[id].ts", README.md (Is it safe?)]'
+y Single "description: 'It''s fine: quoted.'"
+lint 2026-01-02
+expect YAML_INVALID 5
+for n in Colon Tail At Bracket Item; do expect_line YAML_INVALID "$n.md"; done
+if grep -qE 'YAML_INVALID.*(Quoted|Fine|Single)' "$WORK/out"; then echo "FAIL $SCENARIO: flagged a valid value"; FAILS=$((FAILS + 1))
+else echo "ok   $SCENARIO: valid values pass"; fi
 
 # 7c. touched.sh: which notes cite the files a piece of work changed.
 SCENARIO=touched

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.1 - 2026-11-24
+
+- The status note templates wrote a description with an unquoted `: `, which YAML cannot read, so Obsidian and Bases showed every status note without properties. The templates and the example vault now quote it, and the conventions say when a value needs quotes.
+- `/chickadee:check` warns about frontmatter values YAML cannot read (`YAML_INVALID`: an unquoted `: `, a value that starts with `@` or a backtick, text after a closing quote, a bracket inside a flow list item) and its fix quotes them.
+- `/chickadee:setup views` also points out a view that filters on a folder the vault no longer has.
+
 ## 0.8.0 - 2026-11-24
 
 - Decisions that no longer hold say so. A note can carry `status` (`proposed`, `accepted`, `deprecated`, `superseded`), `superseded_by` (a link to the note that replaced it) and `stale_after` (a date to look at it again). A replaced note's description starts with "Superseded by <new note>:" (in Turkish "Yerini <new note> aldı:"), so the first search already shows Claude it is out of date. The routing block is unchanged. All three keys are optional; vaults without them work as before.

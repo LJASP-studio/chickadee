@@ -85,4 +85,5 @@ The vault has `.engram.json` and no `.chickadee.json`. Its notes, privacy levels
 Vaults set up before 0.8.0 lack the review table and a decision table that shows `status`.
 1. Write each file of step 6 that is missing in the views folder, filled in as step 6 says.
 2. If `Decision table.base` exists and has no `note.status`, show the shipped version next to it and offer to replace it; the user may have changed it, so replace only on a yes.
-3. Commit only the files written: `git -C <vault> add -- <paths>`, then `git -C <vault> commit -m "chore: add vault views"`. Report the files in one line.
+3. If an existing view filters on a folder (`file.inFolder("…")`) that is not in the vault, or sorts by a date key other than the vault's, it shows nothing: say so, show the shipped version and replace it on a yes.
+4. Commit only the files written: `git -C <vault> add -- <paths>`, then `git -C <vault> commit -m "chore: add vault views"`. Report the files in one line.

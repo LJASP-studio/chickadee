@@ -1,5 +1,5 @@
 ---
-description: What talks to the network in each project: Inkwell's push-only sync client and tide-cli's planned tide-table reader.
+description: "What talks to the network in each project: Inkwell's push-only sync client and tide-cli's planned tide-table reader."
 date: 2026-11-05
 source: [inkwell/src/sync/client.ts, tide-cli/README.md, tide-cli/internal/forecast/forecast.go]
 code: [inkwell/src/sync/client.ts, tide-cli/internal/forecast/forecast.go]

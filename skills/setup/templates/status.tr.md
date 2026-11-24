@@ -1,5 +1,5 @@
 ---
-description: {{project}} nerede duruyor: şu an ne yapılıyor, sırada ne var, açık sorular, denenip olmayanlar.
+description: "{{project}} nerede duruyor: şu an ne yapılıyor, sırada ne var, açık sorular, denenip olmayanlar."
 date: {{today}}
 tags: [status]
 ---

@@ -1,5 +1,5 @@
 ---
-description: Where tide-cli stands: what is happening now, what is next, open questions and what was tried and did not work.
+description: "Where tide-cli stands: what is happening now, what is next, open questions and what was tried and did not work."
 date: 2026-11-05
 source: [tide-cli/TODO.md]
 tags: [status]

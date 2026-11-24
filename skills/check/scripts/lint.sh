@@ -19,7 +19,7 @@
 # Warnings: NO_MOC DUPLICATE_NAME LIKELY_DUPLICATE STALE INFERRED_UNMARKED PROPOSAL_PENDING
 #           PRIVACY_UNSET PRIVACY_MISMATCH PRIVACY_NONE_NOTES DAILY_CHECK_SKIPPED
 #           DAILY_CHECK_BY_DATE STATUS_UNKNOWN SUPERSEDED_NO_TARGET SUPERSEDED_BY_MISMATCH
-#           LIFECYCLE_NOT_IN_DESCRIPTION REVIEW_DUE STALE_AFTER_INVALID
+#           LIFECYCLE_NOT_IN_DESCRIPTION REVIEW_DUE STALE_AFTER_INVALID YAML_INVALID
 # Counts:   INFERRED (decisions waiting for confirmation), RETIRED (superseded or deprecated
 #           notes), NOTES
 # Exit status: 0 when there are no errors, 1 when there are, 2 on bad usage.
@@ -243,6 +243,32 @@ function additem(f, key, item) {
   items[f, key, nitems[f, key]] = item
   if (key == "tags") tag[f, item] = 1
 }
+# Why a frontmatter value would stop a YAML parser (Obsidian, Bases), or "". s is trimmed;
+# initem is 1 for an item of a flow list [a, b], where brackets and braces also end the item.
+function yamlbad(s, initem) {
+  if (s ~ /^"/) return s ~ /^"([^"\\]|\\.)*"$/ ? "" : "text after the closing quote"
+  if (s ~ /^\047/) return s ~ /^\047([^\047]|\047\047)*\047$/ ? "" : "text after the closing quote"
+  if (s ~ /^[@`]/) return "starts with " substr(s, 1, 1)
+  if (initem && s ~ /[][{}]/) return "has a bracket or brace"
+  if (s ~ /: / || s ~ /:$/) return "has \": \""
+  return ""
+}
+function yamlcheck(f, k, v,   i, c, q, item, n, r) {
+  if (yamlbadnote[f] || v == "" || v ~ /^[|>]/ || v ~ /^\{/) return
+  if (v !~ /^\[/) { r = yamlbad(v, 0) }
+  else if (v !~ /\][ \t]*$/) r = "list has no closing ]"
+  else {
+    v = substr(v, 2); sub(/\][ \t]*$/, "", v); item = ""; q = ""; n = length(v)
+    for (i = 1; i <= n + 1 && r == ""; i++) {
+      c = i <= n ? substr(v, i, 1) : ","
+      if (q != "") { if (c == q) q = ""; item = item c; continue }
+      if (c == "\"" || c == "\047") { q = c; item = item c; continue }
+      if (c == ",") { item = trim(item); if (item != "") r = yamlbad(item, 1); if (r != "") r = r ": " item; item = ""; continue }
+      item = item c
+    }
+  }
+  if (r != "") { yamlbadnote[f] = 1; report("YAML_INVALID", f, k ": " r "; put the value in double quotes") }
+}
 function scan(f,   line, n, fm, code, raw, t, target, d, desc, k, v, cur) {
   n = 0; fm = 0; code = 0; cur = ""; hasfm[f] = 0; hasdesc[f] = 0; hasdate[f] = 0
   while ((getline line < f) > 0) {
@@ -251,11 +277,12 @@ function scan(f,   line, n, fm, code, raw, t, target, d, desc, k, v, cur) {
     if (n == 1 && line == "---") { fm = 1; hasfm[f] = 1; continue }
     if (fm) {
       if (line == "---") { fm = 0; continue }
-      if (cur != "" && line ~ /^[ \t]*- /) { v = line; sub(/^[ \t]*- /, "", v); additem(f, cur, unquote(v)); continue }
+      if (cur != "" && line ~ /^[ \t]*- /) { v = line; sub(/^[ \t]*- /, "", v); yamlcheck(f, cur, trim(v)); additem(f, cur, unquote(v)); continue }
       cur = ""
       if (line !~ /^[A-Za-z_][A-Za-z0-9_-]*:/) continue
       k = line; sub(/:.*/, "", k)
       v = line; sub(/^[^:]*:/, "", v); v = trim(v)
+      yamlcheck(f, k, v)
       if (k == "description" && v != "") { hasdesc[f] = 1; description[f] = v }
       if (k == datefield) {
         d = v; gsub(/[ \t"\047]/, "", d)
@@ -534,7 +561,7 @@ BEGIN {
 
   errors = 0
   nerr = split("MISSING_FRONTMATTER MISSING_DESCRIPTION MISSING_DATE MISSING_SOURCE BROKEN_LINK ORPHAN NOT_IN_MOC NOT_IN_DAILY CODE_PATH_MISSING PROJECTS_ROOT_MISSING SUPERSEDED_BY_BROKEN", checks, " ")
-  nall = split("MISSING_FRONTMATTER MISSING_DESCRIPTION MISSING_DATE MISSING_SOURCE BROKEN_LINK ORPHAN NOT_IN_MOC NOT_IN_DAILY CODE_PATH_MISSING PROJECTS_ROOT_MISSING SUPERSEDED_BY_BROKEN NO_MOC DUPLICATE_NAME LIKELY_DUPLICATE STALE INFERRED_UNMARKED PROPOSAL_PENDING PRIVACY_UNSET PRIVACY_MISMATCH PRIVACY_NONE_NOTES DAILY_CHECK_SKIPPED DAILY_CHECK_BY_DATE STATUS_UNKNOWN SUPERSEDED_NO_TARGET SUPERSEDED_BY_MISMATCH LIFECYCLE_NOT_IN_DESCRIPTION REVIEW_DUE STALE_AFTER_INVALID", checks, " ")
+  nall = split("MISSING_FRONTMATTER MISSING_DESCRIPTION MISSING_DATE MISSING_SOURCE BROKEN_LINK ORPHAN NOT_IN_MOC NOT_IN_DAILY CODE_PATH_MISSING PROJECTS_ROOT_MISSING SUPERSEDED_BY_BROKEN NO_MOC DUPLICATE_NAME LIKELY_DUPLICATE STALE INFERRED_UNMARKED PROPOSAL_PENDING PRIVACY_UNSET PRIVACY_MISMATCH PRIVACY_NONE_NOTES DAILY_CHECK_SKIPPED DAILY_CHECK_BY_DATE STATUS_UNKNOWN SUPERSEDED_NO_TARGET SUPERSEDED_BY_MISMATCH LIFECYCLE_NOT_IN_DESCRIPTION REVIEW_DUE STALE_AFTER_INVALID YAML_INVALID", checks, " ")
   for (i = 1; i <= nall; i++) {
     printf "SUMMARY\t%s\t%d\n", checks[i], count[checks[i]] + 0
     if (i <= nerr) errors += count[checks[i]]

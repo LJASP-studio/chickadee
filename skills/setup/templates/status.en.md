@@ -1,5 +1,5 @@
 ---
-description: Where {{project}} stands: what is happening now, what is next, open questions and what was tried and did not work.
+description: "Where {{project}} stands: what is happening now, what is next, open questions and what was tried and did not work."
 date: {{today}}
 tags: [status]
 ---
